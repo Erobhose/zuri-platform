@@ -1,0 +1,12 @@
+appiVersion: v1
+kind: Service
+metadata:
+  name: zuri-backend
+spec:
+  selector:
+    app: zuri-backend
+  ports:
+    - protocol: TCP
+      ports: 5000
+      targertPort: 5000
+  type: ClusterIP  

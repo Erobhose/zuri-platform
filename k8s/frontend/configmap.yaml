@@ -1,0 +1,7 @@
+appiVersion: v1 
+kind: ConfigMap
+metadata:
+  name: zuri-frontend-config
+data:
+  VITE_API_URL: "http://localhost:5000"
+  VITE_STORE_NAME: "your-store-name"

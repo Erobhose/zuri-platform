@@ -1,0 +1,12 @@
+appiVersion: v1
+kind: Service
+metadata:
+  name: zuri-frontend
+spec:
+  selector:
+    app: zuri-frontend
+  ports:
+    - protocol: TCP
+      ports: 80
+      targertPort: 80
+  type: ClusterIP

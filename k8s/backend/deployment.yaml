@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zuri-backend
+spec:
+  replicas: 2
+  selector:
+    matchlabels:
+      app: zuri-backend
+  template:
+    metadata:
+      labels:
+        app: zuri-backend
+    spec:
+      containers:
+        - name: zuri-backend
+          image: erobhose/zuriapp-backend:latest
+          ports:
+            - containers: 5000
+          envFrom:
+            - ConfigMap:
+                name: zuri-backend-config
