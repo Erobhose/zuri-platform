@@ -5,7 +5,7 @@ metadata:
 spec:
   replicas: 2
   selector:
-    matchlabels:
+    matchLabels:
       app: zuri-backend
   template:
     metadata:
@@ -16,7 +16,7 @@ spec:
         - name: zuri-backend
           image: erobhose/zuriapp-backend:latest
           ports:
-            - containers: 5000
+            - containerPort: 5000
           envFrom:
-            - ConfigMap:
+            - configMapRef:
                 name: zuri-backend-config
