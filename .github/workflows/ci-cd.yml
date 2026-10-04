@@ -1,0 +1,54 @@
+name: Zuri Market CI/CI/CD
+on:
+  push:
+    branches:
+       - Feature
+  pull_request:
+   branches:
+     - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest 
+
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js 
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Checkout platform repository
+        uses: actions/checkout@v4
+
+      - name: Checkout backend repository
+        uses: actions/checkout@v4
+        with:
+          repository: Erobhose/zuriapp-backend
+          ref: Feature
+          path: zuriapp-backend
+
+      - name: Checkout frontend repository
+        uses: actions/checkout@v4
+        with:
+          repository: Erobhose/zuriapp-frontend
+          ref: Feature
+          path: zuriapp-frontend
+
+      - name: install backend dependencies
+        working-directory: zuriapp-backend 
+        run: npm ci 
+
+      - name: Test backend 
+        working-directory: zuriapp-backend
+        run: npm test 
+
+      - name: Install frontend dependencies
+        working-directory: zuriapp-frontend 
+        run: npm ci 
+
+      - name: Build frontend 
+        working-directory: zuriapp-frontend 
+        run: npm run build 
