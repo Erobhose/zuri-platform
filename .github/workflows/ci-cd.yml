@@ -1,27 +1,29 @@
-name: Zuri Market CI/CI/CD
+name: Zuri Market CI/CD
+
 on:
   push:
     branches:
-       - Feature
+      - Feature
   pull_request:
-   branches:
-     - main
+    branches:
+      - main
 
 jobs:
   test:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v4
-        
-      - name: Set up Node.js 
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+      # -------------------------
+      # CHECKOUT
+      # -------------------------
 
       - name: Checkout platform repository
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Checkout backend repository
         uses: actions/checkout@v4
@@ -37,18 +39,100 @@ jobs:
           ref: Feature
           path: zuriapp-frontend
 
-      - name: install backend dependencies
-        working-directory: zuriapp-backend 
-        run: npm ci 
+      # -------------------------
+      # TEST
+      # -------------------------
 
-      - name: Test backend 
+      - name: Install backend dependencies
         working-directory: zuriapp-backend
-        run: npm test 
+        run: npm ci
+
+      - name: Test backend
+        working-directory: zuriapp-backend
+        run: npm test
 
       - name: Install frontend dependencies
-        working-directory: zuriapp-frontend 
-        run: npm ci 
+        working-directory: zuriapp-frontend
+        run: npm ci
 
-      - name: Build frontend 
-        working-directory: zuriapp-frontend 
-        run: npm run build 
+      - name: Build frontend
+        working-directory: zuriapp-frontend
+        run: npm run build
+
+      # -------------------------
+      # SONARQUBE CLOUD
+      # -------------------------
+
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >
+            -Dsonar.projectKey=Erobhose_zuri-platform
+            -Dsonar.organization=erobhose
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/node_modules/**,**/.terraform/**,**/terraform.tfstate*,**/dist/**
+
+      # -------------------------
+      # BUILD DOCKER IMAGES
+      # -------------------------
+
+      - name: Build backend Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./zuriapp-backend
+          load: true
+          tags: |
+            erobhose/zuriapp-backend:latest
+            erobhose/zuriapp-backend:${{ github.sha }}
+
+      - name: Build frontend Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./zuriapp-frontend
+          load: true
+          tags: |
+            erobhose/zuriapp-frontend:latest
+            erobhose/zuriapp-frontend:${{ github.sha }}
+
+      # -------------------------
+      # TRIVY SECURITY SCAN
+      # -------------------------
+
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: erobhose/zuriapp-backend:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: erobhose/zuriapp-frontend:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+      # -------------------------
+      # PUSH TO DOCKER HUB
+      # -------------------------
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push backend Docker images
+        run: |
+          docker push erobhose/zuriapp-backend:latest
+          docker push erobhose/zuriapp-backend:${{ github.sha }}
+
+      - name: Push frontend Docker images
+        run: |
+          docker push erobhose/zuriapp-frontend:latest
+          docker push erobhose/zuriapp-frontend:${{ github.sha }}
