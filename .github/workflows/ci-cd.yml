@@ -1,0 +1,138 @@
+name: Zuri Market CI/CD
+
+on:
+  push:
+    branches:
+      - Feature
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------
+      # CHECKOUT
+      # -------------------------
+
+      - name: Checkout platform repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Checkout backend repository
+        uses: actions/checkout@v4
+        with:
+          repository: Erobhose/zuriapp-backend
+          ref: Feature
+          path: zuriapp-backend
+
+      - name: Checkout frontend repository
+        uses: actions/checkout@v4
+        with:
+          repository: Erobhose/zuriapp-frontend
+          ref: Feature
+          path: zuriapp-frontend
+
+      # -------------------------
+      # TEST
+      # -------------------------
+
+      - name: Install backend dependencies
+        working-directory: zuriapp-backend
+        run: npm ci
+
+      - name: Test backend
+        working-directory: zuriapp-backend
+        run: npm test
+
+      - name: Install frontend dependencies
+        working-directory: zuriapp-frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: zuriapp-frontend
+        run: npm run build
+
+      # -------------------------
+      # SONARQUBE CLOUD
+      # -------------------------
+
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >
+            -Dsonar.projectKey=Erobhose_zuri-platform
+            -Dsonar.organization=erobhose
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/node_modules/**,**/.terraform/**,**/terraform.tfstate*,**/dist/**
+
+      # -------------------------
+      # BUILD DOCKER IMAGES
+      # -------------------------
+
+      - name: Build backend Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: ./zuriapp-backend
+          load: true
+          tags: |
+            erobhose/zuriapp-backend:latest
+            erobhose/zuriapp-backend:${{ github.sha }}
+
+      - name: Build frontend Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: ./zuriapp-frontend
+          load: true
+          tags: |
+            erobhose/zuriapp-frontend:latest
+            erobhose/zuriapp-frontend:${{ github.sha }}
+
+      # -------------------------
+      # TRIVY SECURITY SCAN
+      # -------------------------
+
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
+        with:
+          image-ref: erobhose/zuriapp-backend:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
+        with:
+          image-ref: erobhose/zuriapp-frontend:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+      # -------------------------
+      # PUSH TO DOCKER HUB
+      # -------------------------
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push backend Docker images
+        run: |
+          docker push erobhose/zuriapp-backend:latest
+          docker push erobhose/zuriapp-backend:${{ github.sha }}
+
+      - name: Push frontend Docker images
+        run: |
+          docker push erobhose/zuriapp-frontend:latest
+          docker push erobhose/zuriapp-frontend:${{ github.sha }}
